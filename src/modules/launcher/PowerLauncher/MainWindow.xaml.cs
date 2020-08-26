@@ -1,37 +1,34 @@
-﻿using System;
-using System.ComponentModel;
-using System.Windows;
-using System.Windows.Input;
-using System.Windows.Media.Animation;
-using Wox.Helper;
-using Wox.Infrastructure.UserSettings;
-using Wox.ViewModel;
+﻿// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-using Screen = System.Windows.Forms.Screen;
-using KeyEventArgs = System.Windows.Input.KeyEventArgs;
-using System.Windows.Controls;
-using System.Threading.Tasks;
-using System.Diagnostics;
+using System;
+using System.ComponentModel;
 using System.Timers;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using Microsoft.PowerLauncher.Telemetry;
 using Microsoft.PowerToys.Telemetry;
-
+using PowerLauncher.Helper;
+using PowerLauncher.ViewModel;
+using Wox.Infrastructure.UserSettings;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using Screen = System.Windows.Forms.Screen;
 
 namespace PowerLauncher
 {
     public partial class MainWindow : IDisposable
     {
-
-        #region Private Fields
-        private Settings _settings;
-        private MainViewModel _viewModel;
+        private readonly Settings _settings;
+        private readonly MainViewModel _viewModel;
         private bool _isTextSetProgrammatically;
-        bool _deletePressed = false;
-        Timer _firstDeleteTimer = new Timer();
+        private bool _deletePressed;
+        private Timer _firstDeleteTimer = new Timer();
+        private bool _coldStateHotkeyPressed;
 
-        #endregion
-
-        public MainWindow(Settings settings, MainViewModel mainVM) : this()
+        public MainWindow(Settings settings, MainViewModel mainVM)
+            : this()
         {
             DataContext = mainVM;
             _viewModel = mainVM;
@@ -41,18 +38,20 @@ namespace PowerLauncher
 
             _firstDeleteTimer.Elapsed += CheckForFirstDelete;
             _firstDeleteTimer.Interval = 1000;
-
         }
 
         private void CheckForFirstDelete(object sender, ElapsedEventArgs e)
         {
-            _firstDeleteTimer.Stop();
-            if (_deletePressed)
+            if (_firstDeleteTimer != null)
             {
-                PowerToysTelemetry.Log.WriteEvent(new LauncherFirstDeleteEvent());
+                _firstDeleteTimer.Stop();
+                if (_deletePressed)
+                {
+                    PowerToysTelemetry.Log.WriteEvent(new LauncherFirstDeleteEvent());
+                }
             }
-
         }
+
         public MainWindow()
         {
             InitializeComponent();
@@ -66,22 +65,29 @@ namespace PowerLauncher
         private void BringProcessToForeground()
         {
             // Use SendInput hack to allow Activate to work - required to resolve focus issue https://github.com/microsoft/PowerToys/issues/4270
-            WindowsInteropHelper.INPUT input = new WindowsInteropHelper.INPUT { type = WindowsInteropHelper.INPUTTYPE.INPUT_MOUSE, data = { } };
+            WindowsInteropHelper.INPUT input = new WindowsInteropHelper.INPUT { Type = WindowsInteropHelper.INPUTTYPE.INPUTMOUSE, Data = { } };
             WindowsInteropHelper.INPUT[] inputs = new WindowsInteropHelper.INPUT[] { input };
 
             // Send empty mouse event. This makes this thread the last to send input, and hence allows it to pass foreground permission checks
-            _ = WindowsInteropHelper.SendInput(1, inputs, WindowsInteropHelper.INPUT.Size);
+            _ = NativeMethods.SendInput(1, inputs, WindowsInteropHelper.INPUT.Size);
             Activate();
         }
 
-        private void OnLoaded(object sender, RoutedEventArgs _)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
             WindowsInteropHelper.DisableControlBox(this);
             InitializePosition();
 
             SearchBox.QueryTextBox.DataContext = _viewModel;
-            SearchBox.QueryTextBox.PreviewKeyDown += _launcher_KeyDown;
+            SearchBox.QueryTextBox.PreviewKeyDown += Launcher_KeyDown;
             SearchBox.QueryTextBox.TextChanged += QueryTextBox_TextChanged;
+
+            // Set initial language flow direction
+            SearchBox_UpdateFlowDirection();
+
+            // Register language changed event
+            InputLanguageManager.Current.InputLanguageChanged += SearchBox_InputLanguageChanged;
+
             SearchBox.QueryTextBox.Focus();
 
             ListBox.DataContext = _viewModel;
@@ -97,10 +103,8 @@ namespace PowerLauncher
             var result = ((FrameworkElement)e.OriginalSource).DataContext;
             if (result != null)
             {
-                var resultVM = result as ResultViewModel;
-
-                //This may be null if the tapped item was one of the context buttons (run as admin etc).
-                if (resultVM != null)
+                // This may be null if the tapped item was one of the context buttons (run as admin etc).
+                if (result is ResultViewModel resultVM)
                 {
                     _viewModel.Results.SelectedItem = resultVM;
                     _viewModel.OpenResultCommand.Execute(null);
@@ -110,12 +114,12 @@ namespace PowerLauncher
 
         private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if(e.PropertyName == nameof(MainViewModel.MainWindowVisibility)) 
+            if (e.PropertyName == nameof(MainViewModel.MainWindowVisibility))
             {
                 if (Visibility == System.Windows.Visibility.Visible)
                 {
                     // Not called on first launch
-                    // Additionally called when deactivated by clicking on screen  
+                    // Additionally called when deactivated by clicking on screen
                     UpdatePosition();
                     BringProcessToForeground();
 
@@ -124,10 +128,10 @@ namespace PowerLauncher
                         _viewModel.LastQuerySelected = true;
                     }
                 }
-            }          
+            }
             else if (e.PropertyName == nameof(MainViewModel.SystemQueryText))
             {
-                this._isTextSetProgrammatically = true;
+                _isTextSetProgrammatically = true;
                 if (_viewModel.Results != null)
                 {
                     SearchBox.QueryTextBox.Text = MainViewModel.GetSearchText(
@@ -140,7 +144,10 @@ namespace PowerLauncher
 
         private void OnMouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ChangedButton == MouseButton.Left) DragMove();
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                DragMove();
+            }
         }
 
         private void InitializePosition()
@@ -151,13 +158,21 @@ namespace PowerLauncher
             _settings.WindowLeft = Left;
         }
 
+        private void OnActivated(object sender, EventArgs e)
+        {
+            if (_settings.ClearInputOnLaunch)
+            {
+                _viewModel.ClearQueryCommand.Execute(null);
+            }
+        }
+
         private void OnDeactivated(object sender, EventArgs e)
         {
             if (_settings.HideWhenDeactivated)
             {
-                //(this.FindResource("OutroStoryboard") as Storyboard).Begin();
+                // (this.FindResource("OutroStoryboard") as Storyboard).Begin();
                 Hide();
-            }              
+            }
         }
 
         private void UpdatePosition()
@@ -168,7 +183,7 @@ namespace PowerLauncher
                 Top = _settings.WindowTop;
             }
             else
-            {              
+            {
                 Top = WindowTop();
                 Left = WindowLeft();
             }
@@ -192,7 +207,7 @@ namespace PowerLauncher
             var screen = Screen.FromPoint(System.Windows.Forms.Cursor.Position);
             var dip1 = WindowsInteropHelper.TransformPixelsToDIP(this, screen.WorkingArea.X, 0);
             var dip2 = WindowsInteropHelper.TransformPixelsToDIP(this, screen.WorkingArea.Width, 0);
-            var left = (dip2.X - ActualWidth) / 2 + dip1.X;
+            var left = ((dip2.X - ActualWidth) / 2) + dip1.X;
             return left;
         }
 
@@ -201,11 +216,11 @@ namespace PowerLauncher
             var screen = Screen.FromPoint(System.Windows.Forms.Cursor.Position);
             var dip1 = WindowsInteropHelper.TransformPixelsToDIP(this, 0, screen.WorkingArea.Y);
             var dip2 = WindowsInteropHelper.TransformPixelsToDIP(this, 0, screen.WorkingArea.Height);
-            var top = (dip2.Y - this.SearchBox.ActualHeight) / 4 + dip1.Y;
+            var top = ((dip2.Y - SearchBox.ActualHeight) / 4) + dip1.Y;
             return top;
         }
 
-        private void _launcher_KeyDown(object sender, KeyEventArgs e)
+        private void Launcher_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Tab && Keyboard.IsKeyDown(Key.LeftShift))
             {
@@ -230,6 +245,25 @@ namespace PowerLauncher
                 _viewModel.SelectPrevItemCommand.Execute(null);
                 UpdateTextBoxToSelectedItem();
                 e.Handled = true;
+            }
+            else if (e.Key == Key.Right)
+            {
+                if (SearchBox.QueryTextBox.CaretIndex == SearchBox.QueryTextBox.Text.Length)
+                {
+                    _viewModel.SelectNextContextMenuItemCommand.Execute(null);
+                    e.Handled = true;
+                }
+            }
+            else if (e.Key == Key.Left)
+            {
+                if (SearchBox.QueryTextBox.CaretIndex == SearchBox.QueryTextBox.Text.Length)
+                {
+                    if (_viewModel.Results != null && _viewModel.Results.IsContextMenuItemSelected())
+                    {
+                        _viewModel.SelectPreviousContextMenuItemCommand.Execute(null);
+                        e.Handled = true;
+                    }
+                }
             }
             else if (e.Key == Key.PageDown)
             {
@@ -263,32 +297,30 @@ namespace PowerLauncher
         private void SuggestionsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             ListView listview = (ListView)sender;
-            _viewModel.Results.SelectedItem = (ResultViewModel) listview.SelectedItem;
+            _viewModel.Results.SelectedItem = (ResultViewModel)listview.SelectedItem;
             if (e.AddedItems.Count > 0 && e.AddedItems[0] != null)
             {
                 listview.ScrollIntoView(e.AddedItems[0]);
             }
 
             // To populate the AutoCompleteTextBox as soon as the selection is changed or set.
-            // Setting it here instead of when the text is changed as there is a delay in executing the query and populating the result        
+            // Setting it here instead of when the text is changed as there is a delay in executing the query and populating the result
             if (_viewModel.Results != null)
             {
                 SearchBox.AutoCompleteTextBlock.Text = MainViewModel.GetAutoCompleteText(
                     _viewModel.Results.SelectedIndex,
                     _viewModel.Results.SelectedItem?.ToString(),
                     _viewModel.QueryText);
-            }          
+            }
         }
 
-        private const int millisecondsToWait = 100;
-        private static DateTime s_lastTimeOfTyping;
-        private bool disposedValue = false;
+        private bool disposedValue;
 
         private void QueryTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {          
+        {
             if (_isTextSetProgrammatically)
             {
-                var textBox = ((TextBox)sender);
+                var textBox = (TextBox)sender;
                 textBox.SelectionStart = textBox.Text.Length;
                 _isTextSetProgrammatically = false;
             }
@@ -299,26 +331,12 @@ namespace PowerLauncher
                 {
                     SearchBox.AutoCompleteTextBlock.Text = string.Empty;
                 }
+
                 _viewModel.QueryText = text;
-                var latestTimeOfTyping = DateTime.Now;
-
-                Task.Run(() => DelayedCheck(latestTimeOfTyping));
-                s_lastTimeOfTyping = latestTimeOfTyping;
+                _viewModel.Query();
             }
         }
 
-        private async Task DelayedCheck(DateTime latestTimeOfTyping)
-        {
-            await Task.Delay(millisecondsToWait).ConfigureAwait(false);
-            if (latestTimeOfTyping.Equals(s_lastTimeOfTyping))
-            {
-                await System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    _viewModel.Query();
-                }));
-            }
-        }
-        
         private void ListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton == MouseButton.Right)
@@ -332,22 +350,39 @@ namespace PowerLauncher
             if (Visibility == Visibility.Visible)
             {
                 _deletePressed = false;
-                _firstDeleteTimer.Start();
-                // (this.FindResource("IntroStoryboard") as Storyboard).Begin();
+                if (_firstDeleteTimer != null)
+                {
+                    _firstDeleteTimer.Start();
+                }
 
+                // (this.FindResource("IntroStoryboard") as Storyboard).Begin();
                 SearchBox.QueryTextBox.Focus();
                 Keyboard.Focus(SearchBox.QueryTextBox);
 
                 _settings.ActivateTimes++;
 
-                if (!String.IsNullOrEmpty(SearchBox.QueryTextBox.Text))
+                if (!string.IsNullOrEmpty(SearchBox.QueryTextBox.Text))
                 {
                     SearchBox.QueryTextBox.SelectAll();
+                }
+
+                // Log the time taken from pressing the hotkey till launcher is visible as separate events depending on if it's the first hotkey invoke or second
+                if (!_coldStateHotkeyPressed)
+                {
+                    PowerToysTelemetry.Log.WriteEvent(new LauncherColdStateHotkeyEvent() { HotkeyToVisibleTimeMs = _viewModel.GetHotkeyEventTimeMs() });
+                    _coldStateHotkeyPressed = true;
+                }
+                else
+                {
+                    PowerToysTelemetry.Log.WriteEvent(new LauncherWarmStateHotkeyEvent() { HotkeyToVisibleTimeMs = _viewModel.GetHotkeyEventTimeMs() });
                 }
             }
             else
             {
-                _firstDeleteTimer.Stop();
+                if (_firstDeleteTimer != null)
+                {
+                    _firstDeleteTimer.Stop();
+                }
             }
         }
 
@@ -356,17 +391,32 @@ namespace PowerLauncher
             Hide();
         }
 
+        private void SearchBox_UpdateFlowDirection()
+        {
+            SearchBox.QueryTextBox.FlowDirection = MainViewModel.GetLanguageFlowDirection();
+            SearchBox.AutoCompleteTextBlock.FlowDirection = MainViewModel.GetLanguageFlowDirection();
+        }
+
+        private void SearchBox_InputLanguageChanged(object sender, InputLanguageEventArgs e)
+        {
+            SearchBox_UpdateFlowDirection();
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue)
             {
                 if (disposing)
                 {
-                    _firstDeleteTimer.Dispose();
+                    if (_firstDeleteTimer != null)
+                    {
+                        _firstDeleteTimer.Dispose();
+                    }
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override finalizer
                 // TODO: set large fields to null
+                _firstDeleteTimer = null;
                 disposedValue = true;
             }
         }
@@ -377,7 +427,6 @@ namespace PowerLauncher
         //     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
         //     Dispose(disposing: false);
         // }
-
         public void Dispose()
         {
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method

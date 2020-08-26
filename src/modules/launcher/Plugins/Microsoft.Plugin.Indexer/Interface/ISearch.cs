@@ -1,7 +1,11 @@
-﻿using Microsoft.Plugin.Indexer.SearchHelper;
-using System.Collections.Generic;
+﻿// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-namespace Microsoft.Plugin.Indexer.Interface
+using System.Collections.Generic;
+using Microsoft.Plugin.Indexer.SearchHelper;
+
+namespace Microsoft.Plugin.Indexer
 {
     public interface ISearch
     {

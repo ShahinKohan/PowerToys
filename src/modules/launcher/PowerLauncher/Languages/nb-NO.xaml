@@ -2,6 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <!--MainWindow-->
+    <system:String x:Key="startTyping">Start typing...</system:String>
     <system:String x:Key="registerHotkeyFailed">Kunne ikke registrere hurtigtast: {0}</system:String>
     <system:String x:Key="couldnotStartCmd">Kunne ikke starte {0}</system:String>
     <system:String x:Key="invalidWoxPluginFileFormat">Ugyldig filformat for Wox-utvidelse</system:String>
@@ -124,7 +125,7 @@
     <system:String x:Key="reportWindow_sending">Sender</system:String>
     <system:String x:Key="reportWindow_report_succeed">Rapport sendt med suksess</system:String>
     <system:String x:Key="reportWindow_report_failed">Kunne ikke sende rapport</system:String>
-    <system:String x:Key="reportWindow_wox_got_an_error">Wox møtte på en feil</system:String>
+    <system:String x:Key="reportWindow_wox_got_an_error">PT Run møtte på en feil</system:String>
 
     <!--update-->
     <system:String x:Key="update_wox_update_new_version_available">Versjon {0} av Wox er nå tilgjengelig</system:String>
@@ -136,4 +137,16 @@
     <system:String x:Key="update_wox_update_files">Oppdateringsfiler</system:String>
     <system:String x:Key="update_wox_update_upadte_description">Oppdateringsbeskrivelse</system:String>
 
+    <!--Automation Properties-->
+    <system:String x:Key="AppIcon">Application Icon</system:String>
+    <system:String x:Key="ContextMenuItem">Context Menu Item</system:String>
+    <system:String x:Key="ContextMenuItemAdditionalInformation">Context Menu Item Additional Information</system:String>
+    <system:String x:Key="ContextMenuIcon">Context Menu Icon</system:String>
+    <system:String x:Key="ContextMenuItemsCollection">Context Menu Items Collection</system:String>
+    <system:String x:Key="Query">Query</system:String>
+    <system:String x:Key="Results">Results</system:String>
+    <system:String x:Key="SearchIcon">Search Icon</system:String>
+    <system:String x:Key="Subtitle">Subtitle</system:String>
+    <system:String x:Key="Title">Title</system:String>
+    
 </ResourceDictionary>

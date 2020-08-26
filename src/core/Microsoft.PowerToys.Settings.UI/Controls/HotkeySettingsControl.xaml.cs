@@ -2,20 +2,57 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using Microsoft.PowerToys.Settings.UI.Lib;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Input;
-using System;
-using System.Data;
 
-// The User Control item template is documented at https://go.microsoft.com/fwlink/?LinkId=234236
 namespace Microsoft.PowerToys.Settings.UI.Controls
 {
     public sealed partial class HotkeySettingsControl : UserControl
     {
         public string Header { get; set; }
+
+        public string Keys { get; set; }
+
+        public static readonly DependencyProperty IsActiveProperty =
+            DependencyProperty.Register(
+                "Enabled",
+                typeof(bool),
+                typeof(HotkeySettingsControl),
+                null);
+
+        private bool _enabled = false;
+
+        public bool Enabled
+        {
+            get
+            {
+                return _enabled;
+            }
+
+            set
+            {
+                SetValue(IsActiveProperty, value);
+                _enabled = value;
+
+                if (value)
+                {
+                    HotkeyTextBox.IsEnabled = true;
+
+                    // TitleText.IsActive = "True";
+                    // TitleGlyph.IsActive = "True";
+                }
+                else
+                {
+                    HotkeyTextBox.IsEnabled = false;
+
+                    // TitleText.IsActive = "False";
+                    // TitleGlyph.IsActive = "False";
+                }
+            }
+        }
 
         public static readonly DependencyProperty HotkeySettingsProperty =
             DependencyProperty.Register(
@@ -94,7 +131,6 @@ namespace Microsoft.PowerToys.Settings.UI.Controls
                     return;
                 default:
                     internalSettings.Code = matchValueCode;
-                    internalSettings.Key = matchValueText;
                     break;
             }
         }

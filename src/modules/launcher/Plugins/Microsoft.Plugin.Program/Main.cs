@@ -1,89 +1,66 @@
-using Microsoft.PowerToys.Settings.UI.Lib;
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Timers;
-using System.Windows.Controls;
+using Microsoft.Plugin.Program.Programs;
+using Microsoft.Plugin.Program.Storage;
 using Wox.Infrastructure.Logger;
 using Wox.Infrastructure.Storage;
 using Wox.Plugin;
-using Microsoft.Plugin.Program.Views;
-
 using Stopwatch = Wox.Infrastructure.Stopwatch;
-using Windows.ApplicationModel;
-using Microsoft.Plugin.Program.Storage;
-using Microsoft.Plugin.Program.Programs;
 
 namespace Microsoft.Plugin.Program
 {
     public class Main : IPlugin, IPluginI18n, IContextMenu, ISavable, IReloadable, IDisposable
     {
-        private static readonly object IndexLock = new object();
-        internal static Programs.Win32[] _win32s { get; set; }
-        internal static Settings _settings { get; set; }
-
-        private static bool IsStartupIndexProgramsRequired => _settings.LastIndexTime.AddDays(3) < DateTime.Today;
+        internal static ProgramPluginSettings Settings { get; set; }
 
         private static PluginInitContext _context;
-
-        private static BinaryStorage<Programs.Win32[]> _win32Storage;
-        private readonly PluginJsonStorage<Settings> _settingsStorage;
-        private bool _disposed = false;
-        private PackageRepository _packageRepository = new PackageRepository(new PackageCatalogWrapper(), new BinaryStorage<IList<UWP.Application>>("UWP"));
+        private readonly PluginJsonStorage<ProgramPluginSettings> _settingsStorage;
+        private bool _disposed;
+        private PackageRepository _packageRepository = new PackageRepository(new PackageCatalogWrapper(), new BinaryStorage<IList<UWPApplication>>("UWP"));
+        private static Win32ProgramFileSystemWatchers _win32ProgramRepositoryHelper;
+        private static Win32ProgramRepository _win32ProgramRepository;
 
         public Main()
         {
-            _settingsStorage = new PluginJsonStorage<Settings>();
-            _settings = _settingsStorage.Load();
+            _settingsStorage = new PluginJsonStorage<ProgramPluginSettings>();
+            Settings = _settingsStorage.Load();
 
-            Stopwatch.Normal("|Microsoft.Plugin.Program.Main|Preload programs cost", () =>
-            {
-                _win32Storage = new BinaryStorage<Programs.Win32[]>("Win32");
-                _win32s = _win32Storage.TryLoad(new Programs.Win32[] { });
+            // This helper class initializes the file system watchers based on the locations to watch
+            _win32ProgramRepositoryHelper = new Win32ProgramFileSystemWatchers();
 
-                _packageRepository.Load();
-            });
-            Log.Info($"|Microsoft.Plugin.Program.Main|Number of preload win32 programs <{_win32s.Length}>");
+            // Initialize the Win32ProgramRepository with the settings object
+            _win32ProgramRepository = new Win32ProgramRepository(_win32ProgramRepositoryHelper.FileSystemWatchers.Cast<IFileSystemWatcherWrapper>().ToList(), new BinaryStorage<IList<Programs.Win32Program>>("Win32"), Settings, _win32ProgramRepositoryHelper.PathsToWatch);
 
             var a = Task.Run(() =>
             {
-                if (IsStartupIndexProgramsRequired || !_win32s.Any())
-                    Stopwatch.Normal("|Microsoft.Plugin.Program.Main|Win32Program index cost", IndexWin32Programs);
+                Stopwatch.Normal("|Microsoft.Plugin.Program.Main|Win32Program index cost", _win32ProgramRepository.IndexPrograms);
             });
 
             var b = Task.Run(() =>
             {
-                if (IsStartupIndexProgramsRequired || !_packageRepository.Any())
-                    Stopwatch.Normal("|Microsoft.Plugin.Program.Main|Win32Program index cost", _packageRepository.IndexPrograms);
+                Stopwatch.Normal("|Microsoft.Plugin.Program.Main|Win32Program index cost", _packageRepository.IndexPrograms);
             });
-
 
             Task.WaitAll(a, b);
 
-            _settings.LastIndexTime = DateTime.Today;
+            Settings.LastIndexTime = DateTime.Today;
         }
 
         public void Save()
         {
             _settingsStorage.Save();
-            _win32Storage.Save(_win32s);
-            _packageRepository.Save();
         }
 
         public List<Result> Query(Query query)
         {
-            Programs.Win32[] win32;
-
-            lock (IndexLock)
-            {
-                // just take the reference inside the lock to eliminate query time issues.
-                win32 = _win32s;
-            }
-
-            var results1 = win32.AsParallel()
+            var results1 = _win32ProgramRepository.AsParallel()
                 .Where(p => p.Enabled)
                 .Select(p => p.Result(query.Search, _context.API));
 
@@ -91,49 +68,45 @@ namespace Microsoft.Plugin.Program
                 .Where(p => p.Enabled)
                 .Select(p => p.Result(query.Search, _context.API));
 
-            var result = results1.Concat(results2).Where(r => r != null && r.Score > 0).ToList();
-            return result;
+            var result = results1.Concat(results2).Where(r => r != null && r.Score > 0);
+            if (result.Any())
+            {
+                var maxScore = result.Max(x => x.Score);
+                result = result.Where(x => x.Score > Settings.MinScoreThreshold * maxScore);
+            }
+
+            return result.ToList();
         }
 
         public void Init(PluginInitContext context)
         {
-            _context = context;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
             _context.API.ThemeChanged += OnThemeChanged;
+
             UpdateUWPIconPath(_context.API.GetCurrentTheme());
         }
 
-        public void OnThemeChanged(Theme _, Theme currentTheme)
+        public void OnThemeChanged(Theme currentTheme, Theme newTheme)
         {
-            UpdateUWPIconPath(currentTheme);
+            UpdateUWPIconPath(newTheme);
         }
 
         public void UpdateUWPIconPath(Theme theme)
         {
-            foreach (UWP.Application app in _packageRepository)
+            foreach (UWPApplication app in _packageRepository)
             {
                 app.UpdatePath(theme);
             }
         }
 
-        public static void IndexWin32Programs()
-        {
-            var win32S = Programs.Win32.All(_settings);
-            lock (IndexLock)
-            {
-                _win32s = win32S;
-            }
-        }
-
-
-
         public void IndexPrograms()
         {
-            var t1 = Task.Run(() => IndexWin32Programs());
+            var t1 = Task.Run(() => _win32ProgramRepository.IndexPrograms());
             var t2 = Task.Run(() => _packageRepository.IndexPrograms());
 
             Task.WaitAll(t1, t2);
 
-            _settings.LastIndexTime = DateTime.Today;
+            Settings.LastIndexTime = DateTime.Today;
         }
 
         public string GetTranslatedPluginTitle()
@@ -148,9 +121,13 @@ namespace Microsoft.Plugin.Program
 
         public List<ContextMenuResult> LoadContextMenus(Result selectedResult)
         {
+            if (selectedResult == null)
+            {
+                throw new ArgumentNullException(nameof(selectedResult));
+            }
+
             var menuOptions = new List<ContextMenuResult>();
-            var program = selectedResult.ContextData as Programs.IProgram;
-            if (program != null)
+            if (selectedResult.ContextData is Programs.IProgram program)
             {
                 menuOptions = program.ContextMenus(_context.API);
             }
@@ -158,16 +135,27 @@ namespace Microsoft.Plugin.Program
             return menuOptions;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "We want to keep the process alive and show the user a warning message")]
         public static void StartProcess(Func<ProcessStartInfo, Process> runProcess, ProcessStartInfo info)
         {
             try
             {
+                if (runProcess == null)
+                {
+                    throw new ArgumentNullException(nameof(runProcess));
+                }
+
+                if (info == null)
+                {
+                    throw new ArgumentNullException(nameof(info));
+                }
+
                 runProcess(info);
             }
             catch (Exception)
             {
                 var name = "Plugin: Program";
-                var message = $"Unable to start: {info.FileName}";
+                var message = $"Unable to start: {info?.FileName}";
                 _context.API.ShowMsg(name, message, string.Empty);
             }
         }
@@ -175,10 +163,6 @@ namespace Microsoft.Plugin.Program
         public void ReloadData()
         {
             IndexPrograms();
-        }
-
-        public void UpdateSettings(PowerLauncherSettings settings)
-        {
         }
 
         public void Dispose()
@@ -194,10 +178,10 @@ namespace Microsoft.Plugin.Program
                 if (disposing)
                 {
                     _context.API.ThemeChanged -= OnThemeChanged;
+                    _win32ProgramRepositoryHelper.Dispose();
                     _disposed = true;
                 }
             }
         }
-
     }
 }

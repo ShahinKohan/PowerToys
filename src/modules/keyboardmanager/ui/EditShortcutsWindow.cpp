@@ -9,8 +9,11 @@
 #include <common/dpi_aware.h>
 #include "Styles.h"
 #include "Dialog.h"
-#include <keyboardmanager/dll/resource.h>
+#include <keyboardmanager/dll/Generated Files/resource.h>
 #include <keyboardmanager/common/KeyboardManagerState.h>
+#include "common/common.h"
+#include "LoadingAndSavingRemappingHelper.h"
+extern "C" IMAGE_DOS_HEADER __ImageBase;
 
 using namespace winrt::Windows::Foundation;
 
@@ -31,40 +34,11 @@ static IAsyncAction OnClickAccept(
     XamlRoot root,
     std::function<void()> ApplyRemappings)
 {
-    KeyboardManagerHelper::ErrorType isSuccess = KeyboardManagerHelper::ErrorType::NoError;
-    std::map<std::wstring, std::vector<std::vector<Shortcut>>> appSpecificBuffer;
-
-    // Create per app shortcut buffer
-    for (int i = 0; i < ShortcutControl::shortcutRemapBuffer.size(); i++)
-    {
-        std::wstring currAppName = ShortcutControl::shortcutRemapBuffer[i].second;
-        std::transform(currAppName.begin(), currAppName.end(), currAppName.begin(), towlower);
-
-        if (appSpecificBuffer.find(currAppName) == appSpecificBuffer.end())
-        {
-            appSpecificBuffer[currAppName] = std::vector<std::vector<Shortcut>>();
-        }
-
-        appSpecificBuffer[currAppName].push_back(ShortcutControl::shortcutRemapBuffer[i].first);
-    }
-
-    for (auto it : appSpecificBuffer)
-    {
-        KeyboardManagerHelper::ErrorType currentSuccess = Dialog::CheckIfRemappingsAreValid<Shortcut>(
-            it.second,
-            [](Shortcut shortcut) {
-                return shortcut.IsValidShortcut();
-            });
-        if (currentSuccess != KeyboardManagerHelper::ErrorType::NoError)
-        {
-            isSuccess = currentSuccess;
-            break;
-        }
-    }
+    KeyboardManagerHelper::ErrorType isSuccess = LoadingAndSavingRemappingHelper::CheckIfRemappingsAreValid(ShortcutControl::shortcutRemapBuffer);
 
     if (isSuccess != KeyboardManagerHelper::ErrorType::NoError)
     {
-        if (!co_await Dialog::PartialRemappingConfirmationDialog(root, L"Some of the shortcuts could not be remapped. Do you want to continue anyway?"))
+        if (!co_await Dialog::PartialRemappingConfirmationDialog(root, GET_RESOURCE_STRING(IDS_EDITSHORTCUTS_PARTIALCONFIRMATIONDIALOGTITLE)))
         {
             co_return;
         }
@@ -95,7 +69,7 @@ void createEditShortcutsWindow(HINSTANCE hInst, KeyboardManagerState& keyboardMa
             LR_DEFAULTCOLOR);
         if (RegisterClassEx(&windowClass) == NULL)
         {
-            MessageBox(NULL, L"Windows registration failed!", L"Error", NULL);
+            MessageBox(NULL, GET_RESOURCE_STRING(IDS_REGISTERCLASSFAILED_ERRORMESSAGE).c_str(), GET_RESOURCE_STRING(IDS_REGISTERCLASSFAILED_ERRORTITLE).c_str(), NULL);
             return;
         }
 
@@ -113,7 +87,7 @@ void createEditShortcutsWindow(HINSTANCE hInst, KeyboardManagerState& keyboardMa
     // Window Creation
     HWND _hWndEditShortcutsWindow = CreateWindow(
         szWindowClass,
-        L"Remap shortcuts",
+        GET_RESOURCE_STRING(IDS_EDITSHORTCUTS_WINDOWNAME).c_str(),
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MAXIMIZEBOX,
         (desktopRect.right / 2) - (windowWidth / 2),
         (desktopRect.bottom / 2) - (windowHeight / 2),
@@ -125,7 +99,7 @@ void createEditShortcutsWindow(HINSTANCE hInst, KeyboardManagerState& keyboardMa
         NULL);
     if (_hWndEditShortcutsWindow == NULL)
     {
-        MessageBox(NULL, L"Call to CreateWindow failed!", L"Error", NULL);
+        MessageBox(NULL, GET_RESOURCE_STRING(IDS_CREATEWINDOWFAILED_ERRORMESSAGE).c_str(), GET_RESOURCE_STRING(IDS_CREATEWINDOWFAILED_ERRORTITLE).c_str(), NULL);
         return;
     }
     // Ensures the window is in foreground on first startup. If this is not done, the window appears behind because the thread is not on the foreground.
@@ -155,14 +129,14 @@ void createEditShortcutsWindow(HINSTANCE hInst, KeyboardManagerState& keyboardMa
 
     // Header text
     TextBlock headerText;
-    headerText.Text(L"Remap shortcuts");
+    headerText.Text(GET_RESOURCE_STRING(IDS_EDITSHORTCUTS_WINDOWNAME));
     headerText.FontSize(30);
     headerText.Margin({ 0, 0, 0, 0 });
     header.SetAlignLeftWithPanel(headerText, true);
 
     // Cancel button
     Button cancelButton;
-    cancelButton.Content(winrt::box_value(L"Cancel"));
+    cancelButton.Content(winrt::box_value(GET_RESOURCE_STRING(IDS_CANCEL_BUTTON)));
     cancelButton.Margin({ 10, 0, 0, 0 });
     cancelButton.Click([&](winrt::Windows::Foundation::IInspectable const& sender, RoutedEventArgs const&) {
         // Close the window since settings do not need to be saved
@@ -171,13 +145,13 @@ void createEditShortcutsWindow(HINSTANCE hInst, KeyboardManagerState& keyboardMa
 
     //  Text block for information about remap key section.
     TextBlock shortcutRemapInfoHeader;
-    shortcutRemapInfoHeader.Text(L"Select shortcut you want to change (Shortcut) and the shortcut you want it to invoke (Mapped To).");
+    shortcutRemapInfoHeader.Text(GET_RESOURCE_STRING(IDS_EDITSHORTCUTS_INFO));
     shortcutRemapInfoHeader.Margin({ 10, 0, 0, 10 });
     shortcutRemapInfoHeader.FontWeight(Text::FontWeights::SemiBold());
     shortcutRemapInfoHeader.TextWrapping(TextWrapping::Wrap);
 
     TextBlock shortcutRemapInfoExample;
-    shortcutRemapInfoExample.Text(L"For example, if you want Ctrl+C to paste, Ctrl+C is the \"Shortcut\" and Ctrl+V would be your \"Mapped To\".");
+    shortcutRemapInfoExample.Text(GET_RESOURCE_STRING(IDS_EDITSHORTCUTS_INFOEXAMPLE));
     shortcutRemapInfoExample.Margin({ 10, 0, 0, 20 });
     shortcutRemapInfoExample.FontStyle(Text::FontStyle::Italic);
     shortcutRemapInfoExample.TextWrapping(TextWrapping::Wrap);
@@ -208,19 +182,19 @@ void createEditShortcutsWindow(HINSTANCE hInst, KeyboardManagerState& keyboardMa
 
     // First header textblock in the header row of the shortcut table
     TextBlock originalShortcutHeader;
-    originalShortcutHeader.Text(L"Shortcut:");
+    originalShortcutHeader.Text(GET_RESOURCE_STRING(IDS_EDITSHORTCUTS_SOURCEHEADER));
     originalShortcutHeader.FontWeight(Text::FontWeights::Bold());
     originalShortcutHeader.Margin({ 0, 0, 0, 10 });
 
     // Second header textblock in the header row of the shortcut table
     TextBlock newShortcutHeader;
-    newShortcutHeader.Text(L"Mapped To:");
+    newShortcutHeader.Text(GET_RESOURCE_STRING(IDS_EDITSHORTCUTS_TARGETHEADER));
     newShortcutHeader.FontWeight(Text::FontWeights::Bold());
     newShortcutHeader.Margin({ 0, 0, 0, 10 });
 
     // Third header textblock in the header row of the shortcut table
     TextBlock targetAppHeader;
-    targetAppHeader.Text(L"Target App:");
+    targetAppHeader.Text(GET_RESOURCE_STRING(IDS_EDITSHORTCUTS_TARGETAPPHEADER));
     targetAppHeader.Width(KeyboardManagerConstants::ShortcutTableDropDownWidth);
     targetAppHeader.FontWeight(Text::FontWeights::Bold());
     targetAppHeader.Margin({ 0, 0, 0, 10 });
@@ -273,7 +247,7 @@ void createEditShortcutsWindow(HINSTANCE hInst, KeyboardManagerState& keyboardMa
 
     // Apply button
     Button applyButton;
-    applyButton.Content(winrt::box_value(L"OK"));
+    applyButton.Content(winrt::box_value(GET_RESOURCE_STRING(IDS_OK_BUTTON)));
     applyButton.Style(AccentButtonStyle());
     applyButton.MinWidth(KeyboardManagerConstants::HeaderButtonWidth);
     cancelButton.MinWidth(KeyboardManagerConstants::HeaderButtonWidth);
@@ -281,62 +255,9 @@ void createEditShortcutsWindow(HINSTANCE hInst, KeyboardManagerState& keyboardMa
     header.SetLeftOf(applyButton, cancelButton);
 
     auto ApplyRemappings = [&keyboardManagerState, _hWndEditShortcutsWindow]() {
-        KeyboardManagerHelper::ErrorType isSuccess = KeyboardManagerHelper::ErrorType::NoError;
-        // Clear existing shortcuts
-        keyboardManagerState.ClearOSLevelShortcuts();
-        keyboardManagerState.ClearAppSpecificShortcuts();
-        DWORD successfulOSLevelRemapCount = 0;
-        DWORD successfulAppSpecificRemapCount = 0;
-        // Save the shortcuts that are valid and report if any of them were invalid
-        for (int i = 0; i < ShortcutControl::shortcutRemapBuffer.size(); i++)
-        {
-            Shortcut originalShortcut = ShortcutControl::shortcutRemapBuffer[i].first[0];
-            Shortcut newShortcut = ShortcutControl::shortcutRemapBuffer[i].first[1];
-
-            if (originalShortcut.IsValidShortcut() && newShortcut.IsValidShortcut())
-            {
-                if (ShortcutControl::shortcutRemapBuffer[i].second == L"")
-                {
-                    bool result = keyboardManagerState.AddOSLevelShortcut(originalShortcut, newShortcut);
-                    if (!result)
-                    {
-                        isSuccess = KeyboardManagerHelper::ErrorType::RemapUnsuccessful;
-                    }
-                    else
-                    {
-                        successfulOSLevelRemapCount += 1;
-                    }
-                }
-                else
-                {
-                    bool result = keyboardManagerState.AddAppSpecificShortcut(ShortcutControl::shortcutRemapBuffer[i].second, originalShortcut, newShortcut);
-                    if (!result)
-                    {
-                        isSuccess = KeyboardManagerHelper::ErrorType::RemapUnsuccessful;
-                    }
-                    else
-                    {
-                        successfulAppSpecificRemapCount += 1;
-                    }
-                }
-            }
-            else
-            {
-                isSuccess = KeyboardManagerHelper::ErrorType::RemapUnsuccessful;
-            }
-        }
-
-        // Telemetry events
-        Trace::OSLevelShortcutRemapCount(successfulOSLevelRemapCount);
-        Trace::AppSpecificShortcutRemapCount(successfulAppSpecificRemapCount);
-
+        LoadingAndSavingRemappingHelper::ApplyShortcutRemappings(keyboardManagerState, ShortcutControl::shortcutRemapBuffer, true);
         // Save the updated key remaps to file.
         bool saveResult = keyboardManagerState.SaveConfigToFile();
-        if (!saveResult)
-        {
-            isSuccess = KeyboardManagerHelper::ErrorType::SaveFailed;
-        }
-
         PostMessage(_hWndEditShortcutsWindow, WM_CLOSE, 0, 0);
     };
 

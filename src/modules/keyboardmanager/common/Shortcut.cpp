@@ -2,7 +2,6 @@
 #include "Shortcut.h"
 #include "../common/keyboard_layout.h"
 #include "../common/shared_constants.h"
-#include <interface/lowlevel_keyboard_event_data.h>
 #include "Helpers.h"
 #include "InputInterface.h"
 
@@ -16,6 +15,12 @@ Shortcut::Shortcut(const std::wstring& shortcutVK) :
         auto vkKeyCode = std::stoul(it);
         SetKey(vkKeyCode);
     }
+}
+
+// Constructor to initialize shortcut from a list of keys
+Shortcut::Shortcut(const std::vector<DWORD>& keys)
+{
+    SetKeyCodes(keys);
 }
 
 // Function to return the number of keys in the shortcut

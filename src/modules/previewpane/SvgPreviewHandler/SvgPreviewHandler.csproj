@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-  <Import Project="..\..\..\..\installer\Version.props" />
+  <Import Project="..\..\..\Version.props" />
   <!-- We don't have GenerateAssemblyInfo task until we use .net core, so we generate it with WriteLinesToFile -->
   <PropertyGroup>
     <AssemblyTitle>SvgPreviewHandler</AssemblyTitle>
@@ -97,6 +97,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\codeAnalysis\GlobalSuppressions.cs">
+      <Link>GlobalSuppressions.cs</Link>
+    </Compile>
     <Compile Include="Generated Files\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -112,7 +115,6 @@
     <Compile Include="Telemetry\Events\SvgFileHandlerLoaded.cs" />
     <Compile Include="Telemetry\Events\SvgFilePreviewed.cs" />
     <Compile Include="Telemetry\Events\SvgFilePreviewError.cs" />
-    <Compile Include="Utilities\SvgPreviewHandlerHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\common\ManagedTelemetry\Telemetry\Telemetry.csproj">

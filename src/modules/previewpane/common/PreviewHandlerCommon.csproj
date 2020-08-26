@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-  <Import Project="..\..\..\..\installer\Version.props" />
+  <Import Project="..\..\..\Version.props" />
   <!-- We don't have GenerateAssemblyInfo task until we use .net core, so we generate it with WriteLinesToFile -->
   <PropertyGroup>
     <AssemblyTitle>PreviewHandlerCommon</AssemblyTitle>
@@ -95,6 +95,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\codeAnalysis\GlobalSuppressions.cs">
+      <Link>GlobalSuppressions.cs</Link>
+    </Compile>
     <Compile Include="cominterop\IInitializeWithFile.cs" />
     <Compile Include="cominterop\COLORREF.cs" />
     <Compile Include="cominterop\IInitializeWithStream.cs" />
@@ -103,6 +106,8 @@
     <Compile Include="cominterop\IPreviewHandler.cs" />
     <Compile Include="cominterop\IPreviewHandlerFrame.cs" />
     <Compile Include="cominterop\IPreviewHandlerVisuals.cs" />
+    <Compile Include="cominterop\IThumbnailProvider.cs" />
+    <Compile Include="cominterop\IViewObject.cs" />
     <Compile Include="cominterop\LOGFONT.cs" />
     <Compile Include="cominterop\MSG.cs" />
     <Compile Include="cominterop\RECT.cs" />
@@ -125,6 +130,7 @@
     <Compile Include="handlers\StreamBasedPreviewHandler.cs" />
     <Compile Include="examplehandler\TestCustomHandler.cs" />
     <Compile Include="Utilities\StreamWrapper.cs" />
+    <Compile Include="Utilities\SvgPreviewHandlerHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="..\..\..\codeAnalysis\StyleCop.json">

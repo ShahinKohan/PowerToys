@@ -1,4 +1,7 @@
-﻿using Microsoft.Plugin.Indexer.Interface;
+﻿// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
 using System;
 using System.Collections.Generic;
 using System.Data.OleDb;
@@ -7,33 +10,33 @@ namespace Microsoft.Plugin.Indexer.SearchHelper
 {
     public class OleDBSearch : ISearch
     {
-        private OleDbCommand command;
-        private OleDbConnection conn;
-        private OleDbDataReader WDSResults;
-
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Security",
+            "CA2100:Review SQL queries for security vulnerabilities",
+            Justification = "sqlQuery does not come from user input but is generated via the ISearchQueryHelper::GenerateSqlFromUserQuery see: https://docs.microsoft.com/en-us/windows/win32/search/-search-3x-wds-qryidx-searchqueryhelper#using-the-generatesqlfromuserquery-method")]
         public List<OleDBResult> Query(string connectionString, string sqlQuery)
         {
             List<OleDBResult> result = new List<OleDBResult>();
-
-            using (conn = new OleDbConnection(connectionString))
+            using (var conn = new OleDbConnection(connectionString))
             {
                 // open the connection
                 conn.Open();
 
                 // now create an OleDB command object with the query we built above and the connection we just opened.
-                using (command = new OleDbCommand(sqlQuery, conn))
+                using (var command = new OleDbCommand(sqlQuery, conn))
                 {
-                    using (WDSResults = command.ExecuteReader())
+                    using (var wDSResults = command.ExecuteReader())
                     {
-                        if (WDSResults.HasRows)
+                        if (!wDSResults.IsClosed && wDSResults.HasRows)
                         {
-                            while (WDSResults.Read())
+                            while (!wDSResults.IsClosed && wDSResults.Read())
                             {
-                                List<Object> fieldData = new List<object>();
-                                for (int i = 0; i < WDSResults.FieldCount; i++)
+                                List<object> fieldData = new List<object>(wDSResults.FieldCount);
+                                for (int i = 0; i < wDSResults.FieldCount; i++)
                                 {
-                                    fieldData.Add(WDSResults.GetValue(i));
+                                    fieldData.Add(wDSResults.GetValue(i));
                                 }
+
                                 result.Add(new OleDBResult(fieldData));
                             }
                         }
@@ -42,39 +45,6 @@ namespace Microsoft.Plugin.Indexer.SearchHelper
             }
 
             return result;
-        }
-
-        /// Checks if all the variables related to database connection have been properly disposed 
-        public bool HaveAllDisposableItemsBeenDisposed()
-        {
-            bool commandDisposed = false;
-            bool connDisposed = false;
-            bool resultDisposed = false;
-
-            try
-            {
-                command.ExecuteReader();
-            }
-            catch (InvalidOperationException)
-            {
-                commandDisposed = true;
-            }
-
-            try
-            {
-                WDSResults.Read();
-            }
-            catch (InvalidOperationException)
-            {
-                resultDisposed = true;
-            }
-
-            if(conn.State == System.Data.ConnectionState.Closed)
-            {
-                connDisposed = true;
-            }
-
-            return commandDisposed && resultDisposed && connDisposed;
         }
     }
 }

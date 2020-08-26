@@ -2,6 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <!--MainWindow-->
+    <system:String x:Key="startTyping">Start typing...</system:String>
     <system:String x:Key="registerHotkeyFailed">Tastenkombinationregistrierung: {0} fehlgeschlagen</system:String>
     <system:String x:Key="couldnotStartCmd">Kann {0} nicht starten</system:String>
     <system:String x:Key="invalidWoxPluginFileFormat">Fehlerhaftes Wox-Plugin Dateiformat</system:String>
@@ -22,11 +23,18 @@
     <system:String x:Key="dontPromptUpdateMsg">Zeige keine Nachricht wenn eine neue Version vorhanden ist</system:String>
     <system:String x:Key="rememberLastLocation">Merke letzte Ausführungsposition</system:String>
     <system:String x:Key="language">Sprache</system:String>
+    <system:String x:Key="lastQueryMode">Letzter Anfragenstyle</system:String>
+    <system:String x:Key="LastQueryPreserved">Letzte erhaltene Anfrage</system:String>
+    <system:String x:Key="LastQuerySelected">Letzte Anfrage anuswählen</system:String>
+    <system:String x:Key="LastQueryEmpty">Leerer letzte Anfrage</system:String>
     <system:String x:Key="maxShowResults">Maximale Anzahl Ergebnissen</system:String>
     <system:String x:Key="ignoreHotkeysOnFullscreen">Ignoriere Tastenkombination wenn Fenster im Vollbildmodus ist</system:String>
     <system:String x:Key="autoUpdates">Automatische Aktualisierung</system:String>
     <system:String x:Key="hideOnStartup">Verstecke Wox bei Systemstart</system:String>
-    
+    <system:String x:Key="hideNotifyIcon">Verstecke Taskbar icon</system:String>
+    <system:String x:Key="querySearchPrecision">Suchanfrage verfeinern</system:String>
+    <system:String x:Key="ShouldUsePinyin">Sollte Pinyin benutzen</system:String>
+   
     <!--Setting Plugin-->
     <system:String x:Key="plugin">Plugin</system:String>
     <system:String x:Key="browserMorePlugins">Suche nach weiteren Plugins</system:String>
@@ -45,7 +53,9 @@
     <system:String x:Key="resultItemFont">Ergebnis Schriftart</system:String>
     <system:String x:Key="windowMode">Fenstermodus</system:String>
     <system:String x:Key="opacity">Transparenz</system:String>
-    
+    <system:String x:Key="theme_load_failure_path_not_exists">Design {0} existiert nicht. Zurück zum Standarddesign</system:String>
+    <system:String x:Key="theme_load_failure_parse_error">Fehler beim Laden von Design {0}. Zurück zum Standarddesign</system:String>
+   
     <!--Setting Hotkey-->
     <system:String x:Key="hotkey">Tastenkombination</system:String>
     <system:String x:Key="woxHotkey">Wox Tastenkombination</system:String>
@@ -79,6 +89,11 @@
     <system:String x:Key="about_activate_times">Sie haben Wox {0} mal aktiviert</system:String>
     <system:String x:Key="checkUpdates">Nach Aktuallisierungen Suchen</system:String>
     <system:String x:Key="newVersionTips">Eine neue Version ({0}) ist vorhanden. Bitte starten Sie Wox neu.</system:String>
+    <system:String x:Key="checkUpdatesFailed">Suche nach Updates gescheitert, bitte überprüfe deine Verbindung und Proxyeinstelllungen zu api.github.com</system:String>
+    <system:String x:Key="downloadUpdatesFailed">
+        Updates herunterladen gescheitert, bitte überprüfe deine Verbindung und Proxyeinstelllungen zu github-cloud.s3.amazonaws.com 
+        oder gehe zu https://github.com/Wox-launcher/Wox/releases um automatisch herunterzuladen.
+    </system:String>
     <system:String x:Key="releaseNotes">Versionshinweise:</system:String>
 
     <!--Action Keyword Setting Dialog-->
@@ -115,7 +130,7 @@
     <system:String x:Key="reportWindow_sending">Sende</system:String>
     <system:String x:Key="reportWindow_report_succeed">Report erfolgreich</system:String>
     <system:String x:Key="reportWindow_report_failed">Report fehlgeschlagen</system:String>
-    <system:String x:Key="reportWindow_wox_got_an_error">Wox hat einen Fehler</system:String>
+    <system:String x:Key="reportWindow_wox_got_an_error">PT Run hat einen Fehler</system:String>
 
     <!--update-->
     <system:String x:Key="update_wox_update_new_version_available">V{0} von Wox ist verfügbar</system:String>
@@ -126,5 +141,17 @@
     <system:String x:Key="update_wox_update_upadte_files">Folgende Dateien werden aktualisiert</system:String>
     <system:String x:Key="update_wox_update_files">Aktualisiere Dateien</system:String>
     <system:String x:Key="update_wox_update_upadte_description">Aktualisierungbeschreibung</system:String>
+
+    <!--Automation Properties-->
+    <system:String x:Key="AppIcon">Application Icon</system:String>
+    <system:String x:Key="ContextMenuItem">Context Menu Item</system:String>
+    <system:String x:Key="ContextMenuItemAdditionalInformation">Context Menu Item Additional Information</system:String>
+    <system:String x:Key="ContextMenuIcon">Context Menu Icon</system:String>
+    <system:String x:Key="ContextMenuItemsCollection">Context Menu Items Collection</system:String>
+    <system:String x:Key="Query">Query</system:String>
+    <system:String x:Key="Results">Results</system:String>
+    <system:String x:Key="SearchIcon">Search Icon</system:String>
+    <system:String x:Key="Subtitle">Subtitle</system:String>
+    <system:String x:Key="Title">Title</system:String>
     
 </ResourceDictionary>

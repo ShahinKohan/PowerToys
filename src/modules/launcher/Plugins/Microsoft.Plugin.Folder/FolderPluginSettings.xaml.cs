@@ -1,4 +1,9 @@
-﻿using System.Collections.Generic;
+﻿// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -11,26 +16,24 @@ using MessageBox = System.Windows.MessageBox;
 
 namespace Microsoft.Plugin.Folder
 {
-
     public partial class FileSystemSettings
     {
-        private IPublicAPI woxAPI;
-        private Settings _settings;
+        private IPublicAPI _woxAPI;
+        private FolderSettings _settings;
 
-        public FileSystemSettings(IPublicAPI woxAPI, Settings settings)
+        public FileSystemSettings(IPublicAPI woxAPI, FolderSettings settings)
         {
-            this.woxAPI = woxAPI;
+            _woxAPI = woxAPI;
             InitializeComponent();
-            _settings = settings;
+            _settings = settings ?? throw new ArgumentNullException(paramName: nameof(settings));
             lbxFolders.ItemsSource = _settings.FolderLinks;
         }
 
-        private void btnDelete_Click(object sender, RoutedEventArgs e)
+        private void BtnDelete_Click(object sender, RoutedEventArgs e)
         {
-            var selectedFolder = lbxFolders.SelectedItem as FolderLink;
-            if (selectedFolder != null)
+            if (lbxFolders.SelectedItem is FolderLink selectedFolder)
             {
-                string msg = string.Format(woxAPI.GetTranslation("wox_plugin_folder_delete_folder_link"), selectedFolder.Path);
+                string msg = string.Format(CultureInfo.InvariantCulture, _woxAPI.GetTranslation("wox_plugin_folder_delete_folder_link"), selectedFolder.Path);
 
                 if (MessageBox.Show(msg, string.Empty, MessageBoxButton.YesNo) == MessageBoxResult.Yes)
                 {
@@ -40,72 +43,65 @@ namespace Microsoft.Plugin.Folder
             }
             else
             {
-                string warning = woxAPI.GetTranslation("wox_plugin_folder_select_folder_link_warning");
+                string warning = _woxAPI.GetTranslation("wox_plugin_folder_select_folder_link_warning");
                 MessageBox.Show(warning);
             }
         }
 
-        private void btnEdit_Click(object sender, RoutedEventArgs e)
+        private void BtnEdit_Click(object sender, RoutedEventArgs e)
         {
-            var selectedFolder = lbxFolders.SelectedItem as FolderLink;
-            if (selectedFolder != null)
+            if (lbxFolders.SelectedItem is FolderLink selectedFolder)
             {
-                var folderBrowserDialog = new FolderBrowserDialog();
-                folderBrowserDialog.SelectedPath = selectedFolder.Path;
+                using (var folderBrowserDialog = new FolderBrowserDialog())
+                {
+                    folderBrowserDialog.SelectedPath = selectedFolder.Path;
+                    if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        var link = _settings.FolderLinks.First(x => x.Path == selectedFolder.Path);
+                        link.Path = folderBrowserDialog.SelectedPath;
+                    }
+
+                    lbxFolders.Items.Refresh();
+                }
+            }
+            else
+            {
+                string warning = _woxAPI.GetTranslation("wox_plugin_folder_select_folder_link_warning");
+                MessageBox.Show(warning);
+            }
+        }
+
+        private void BtnAdd_Click(object sender, RoutedEventArgs e)
+        {
+            using (var folderBrowserDialog = new FolderBrowserDialog())
+            {
                 if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
                 {
-                    var link = _settings.FolderLinks.First(x => x.Path == selectedFolder.Path);
-                    link.Path = folderBrowserDialog.SelectedPath;
+                    var newFolder = new FolderLink
+                    {
+                        Path = folderBrowserDialog.SelectedPath,
+                    };
+
+                    _settings.FolderLinks.Add(newFolder);
                 }
 
                 lbxFolders.Items.Refresh();
             }
-            else
-            {
-                string warning = woxAPI.GetTranslation("wox_plugin_folder_select_folder_link_warning");
-                MessageBox.Show(warning);
-            }
         }
 
-        private void btnAdd_Click(object sender, RoutedEventArgs e)
-        {
-            var folderBrowserDialog = new FolderBrowserDialog();
-            if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
-            {
-                var newFolder = new FolderLink
-                {
-                    Path = folderBrowserDialog.SelectedPath
-                };
-
-                if (_settings.FolderLinks == null)
-                {
-                    _settings.FolderLinks = new List<FolderLink>();
-                }
-
-                _settings.FolderLinks.Add(newFolder);
-            }
-
-            lbxFolders.Items.Refresh();
-        }
-
-        private void lbxFolders_Drop(object sender, DragEventArgs e)
+        private void LbxFolders_Drop(object sender, DragEventArgs e)
         {
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
 
-            if (files != null && files.Count() > 0)
+            if (files != null && files.Any())
             {
-                if (_settings.FolderLinks == null)
-                {
-                    _settings.FolderLinks = new List<FolderLink>();
-                }
-
                 foreach (string s in files)
                 {
                     if (Directory.Exists(s))
                     {
                         var newFolder = new FolderLink
                         {
-                            Path = s
+                            Path = s,
                         };
 
                         _settings.FolderLinks.Add(newFolder);
@@ -116,7 +112,7 @@ namespace Microsoft.Plugin.Folder
             }
         }
 
-        private void lbxFolders_DragEnter(object sender, DragEventArgs e)
+        private void LbxFolders_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {

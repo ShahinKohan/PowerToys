@@ -1,8 +1,11 @@
-﻿using System;
+﻿// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Media;
 
 namespace Wox.Infrastructure.Image
@@ -11,9 +14,11 @@ namespace Wox.Infrastructure.Image
     public class ImageCache
     {
         private const int MaxCached = 50;
-        public ConcurrentDictionary<string, int> Usage = new ConcurrentDictionary<string, int>();
+        private const int PermissibleFactor = 2;
+
         private readonly ConcurrentDictionary<string, ImageSource> _data = new ConcurrentDictionary<string, ImageSource>();
-        private const int permissibleFactor = 2;
+
+        public ConcurrentDictionary<string, int> Usage { get; set; } = new ConcurrentDictionary<string, int>();
 
         public ImageSource this[string path]
         {
@@ -23,13 +28,14 @@ namespace Wox.Infrastructure.Image
                 var i = _data[path];
                 return i;
             }
-            set 
+
+            set
             {
                 _data[path] = value;
 
                 // To prevent the dictionary from drastically increasing in size by caching images, the dictionary size is not allowed to grow more than the permissibleFactor * maxCached size
                 // This is done so that we don't constantly perform this resizing operation and also maintain the image cache size at the same time
-                if (_data.Count > permissibleFactor * MaxCached)
+                if (_data.Count > PermissibleFactor * MaxCached)
                 {
                     // This function resizes the Usage dictionary, taking the top 'maxCached' number of items and filtering the image icons that are not accessed frequently.
                     Cleanup();
@@ -37,11 +43,9 @@ namespace Wox.Infrastructure.Image
                     // To delete the images from the data dictionary based on the resizing of the Usage Dictionary.
                     foreach (var key in _data.Keys)
                     {
-                        int dictValue;
-                        if (!Usage.TryGetValue(key, out dictValue) && !(key.Equals(Constant.ErrorIcon) || key.Equals(Constant.DefaultIcon)))
+                        if (!Usage.TryGetValue(key, out _) && !(key.Equals(Constant.ErrorIcon) || key.Equals(Constant.DefaultIcon) || key.Equals(Constant.LightThemedErrorIcon) || key.Equals(Constant.LightThemedDefaultIcon)))
                         {
-                            ImageSource imgSource;
-                            _data.TryRemove(key, out imgSource);
+                            _data.TryRemove(key, out _);
                         }
                     }
                 }
@@ -86,5 +90,4 @@ namespace Wox.Infrastructure.Image
             Usage = new ConcurrentDictionary<string, int>(usage);
         }
     }
-
 }

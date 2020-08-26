@@ -1,10 +1,8 @@
 #include "pch.h"
 #include <interface/powertoy_module_interface.h>
-#include <interface/lowlevel_keyboard_event_data.h>
-#include <interface/win_hook_event_data.h>
 #include <common/settings_objects.h>
 #include <common/shared_constants.h>
-#include "resource.h"
+#include "Generated Files/resource.h"
 #include <keyboardmanager/ui/EditKeyboardWindow.h>
 #include <keyboardmanager/ui/EditShortcutsWindow.h>
 #include <keyboardmanager/common/KeyboardManagerState.h>
@@ -14,6 +12,7 @@
 #include <common/settings_helpers.h>
 #include <common/debug_control.h>
 #include <keyboardmanager/common/trace.h>
+#include <keyboardmanager/common/Helpers.h>
 #include "KeyboardEventHandlers.h"
 #include "Input.h"
 
@@ -105,7 +104,18 @@ public:
                                 {
                                     auto originalKey = it.GetObjectW().GetNamedString(KeyboardManagerConstants::OriginalKeysSettingName);
                                     auto newRemapKey = it.GetObjectW().GetNamedString(KeyboardManagerConstants::NewRemapKeysSettingName);
-                                    keyboardManagerState.AddSingleKeyRemap(std::stoul(originalKey.c_str()), std::stoul(newRemapKey.c_str()));
+
+                                    // If remapped to a shortcut
+                                    if (std::wstring(newRemapKey).find(L";") != std::string::npos)
+                                    {
+                                        keyboardManagerState.AddSingleKeyRemap(std::stoul(originalKey.c_str()), Shortcut(newRemapKey.c_str()));
+                                    }
+
+                                    // If remapped to a key
+                                    else
+                                    {
+                                        keyboardManagerState.AddSingleKeyRemap(std::stoul(originalKey.c_str()), std::stoul(newRemapKey.c_str()));
+                                    }
                                 }
                                 catch (...)
                                 {
@@ -137,9 +147,18 @@ public:
                                     {
                                         auto originalKeys = it.GetObjectW().GetNamedString(KeyboardManagerConstants::OriginalKeysSettingName);
                                         auto newRemapKeys = it.GetObjectW().GetNamedString(KeyboardManagerConstants::NewRemapKeysSettingName);
-                                        Shortcut originalSC(originalKeys.c_str());
-                                        Shortcut newRemapSC(newRemapKeys.c_str());
-                                        keyboardManagerState.AddOSLevelShortcut(originalSC, newRemapSC);
+
+                                        // If remapped to a shortcut
+                                        if (std::wstring(newRemapKeys).find(L";") != std::string::npos)
+                                        {
+                                            keyboardManagerState.AddOSLevelShortcut(Shortcut(originalKeys.c_str()), Shortcut(newRemapKeys.c_str()));
+                                        }
+
+                                        // If remapped to a key
+                                        else
+                                        {
+                                            keyboardManagerState.AddOSLevelShortcut(Shortcut(originalKeys.c_str()), std::stoul(newRemapKeys.c_str()));
+                                        }
                                     }
                                     catch (...)
                                     {
@@ -163,9 +182,18 @@ public:
                                         auto originalKeys = it.GetObjectW().GetNamedString(KeyboardManagerConstants::OriginalKeysSettingName);
                                         auto newRemapKeys = it.GetObjectW().GetNamedString(KeyboardManagerConstants::NewRemapKeysSettingName);
                                         auto targetApp = it.GetObjectW().GetNamedString(KeyboardManagerConstants::TargetAppSettingName);
-                                        Shortcut originalSC(originalKeys.c_str());
-                                        Shortcut newRemapSC(newRemapKeys.c_str());
-                                        keyboardManagerState.AddAppSpecificShortcut(targetApp.c_str(), originalSC, newRemapSC);
+
+                                        // If remapped to a shortcut
+                                        if (std::wstring(newRemapKeys).find(L";") != std::string::npos)
+                                        {
+                                            keyboardManagerState.AddAppSpecificShortcut(targetApp.c_str(), Shortcut(originalKeys.c_str()), Shortcut(newRemapKeys.c_str()));
+                                        }
+
+                                        // If remapped to a key
+                                        else
+                                        {
+                                            keyboardManagerState.AddAppSpecificShortcut(targetApp.c_str(), Shortcut(originalKeys.c_str()), std::stoul(newRemapKeys.c_str()));
+                                        }
                                     }
                                     catch (...)
                                     {
@@ -203,16 +231,6 @@ public:
     virtual const wchar_t* get_name() override
     {
         return app_name.c_str();
-    }
-
-    // Return array of the names of all events that this powertoy listens for, with
-    // nullptr as the last element of the array. Nullptr can also be returned for empty
-    // list.
-    virtual const wchar_t** get_events() override
-    {
-        static const wchar_t* events[] = { ll_keyboard, nullptr };
-
-        return events;
     }
 
     // Return JSON with the configuration options.
@@ -309,16 +327,6 @@ public:
         return m_enabled;
     }
 
-    // Handle incoming event, data is event-specific
-    virtual intptr_t signal_event(const wchar_t* name, intptr_t data) override
-    {
-        return 0;
-    }
-
-    virtual void register_system_menu_helper(PowertoySystemMenuIface* helper) override {}
-
-    virtual void signal_system_menu_action(const wchar_t* name) override {}
-
     // Hook procedure definition
     static LRESULT CALLBACK hook_proc(int nCode, WPARAM wParam, LPARAM lParam)
     {
@@ -390,6 +398,17 @@ public:
             return 0;
         }
 
+        // If the Detect Shortcut Window from Remap Keys is currently activated, then suppress the keyboard event
+        KeyboardManagerHelper::KeyboardHookDecision remapKeyShortcutUIDetected = keyboardManagerState.DetectShortcutUIBackend(data, true);
+        if (remapKeyShortcutUIDetected == KeyboardManagerHelper::KeyboardHookDecision::Suppress)
+        {
+            return 1;
+        }
+        else if (remapKeyShortcutUIDetected == KeyboardManagerHelper::KeyboardHookDecision::SkipHook)
+        {
+            return 0;
+        }
+
         // Remap a key
         intptr_t SingleKeyRemapResult = KeyboardEventHandlers::HandleSingleKeyRemapEvent(inputHandler, data, keyboardManagerState);
 
@@ -400,7 +419,7 @@ public:
         }
 
         // If the Detect Shortcut Window is currently activated, then suppress the keyboard event
-        KeyboardManagerHelper::KeyboardHookDecision shortcutUIDetected = keyboardManagerState.DetectShortcutUIBackend(data);
+        KeyboardManagerHelper::KeyboardHookDecision shortcutUIDetected = keyboardManagerState.DetectShortcutUIBackend(data, false);
         if (shortcutUIDetected == KeyboardManagerHelper::KeyboardHookDecision::Suppress)
         {
             return 1;

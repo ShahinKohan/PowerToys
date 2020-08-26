@@ -1,40 +1,37 @@
-using Microsoft.PowerToys.Settings.UI.Lib;
+// Copyright (c) Microsoft Corporation
+// The Microsoft Corporation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
-using System.Windows;
-using WindowsInput;
-using WindowsInput.Native;
+using System.Reflection;
+using System.Windows.Input;
+using Microsoft.PowerToys.Settings.UI.Lib;
 using Wox.Infrastructure.Logger;
 using Wox.Infrastructure.Storage;
-using Wox.Plugin.SharedCommands;
 using Wox.Plugin;
-using Application = System.Windows.Application;
+using Wox.Plugin.SharedCommands;
 using Control = System.Windows.Controls.Control;
-using Keys = System.Windows.Forms.Keys;
-using System.Windows.Input;
-using System.Reflection;
 
 namespace Microsoft.Plugin.Shell
 {
     public class Main : IPlugin, ISettingProvider, IPluginI18n, IContextMenu, ISavable
     {
-        private string IconPath { get; set; }
-        private PluginInitContext _context;
-        private bool _winRStroked;
-        private readonly KeyboardSimulator _keyboardSimulator = new KeyboardSimulator(new InputSimulator());
+        private readonly ShellPluginSettings _settings;
+        private readonly PluginJsonStorage<ShellPluginSettings> _storage;
 
-        private readonly Settings _settings;
-        private readonly PluginJsonStorage<Settings> _storage;
+        private string IconPath { get; set; }
+
+        private PluginInitContext _context;
 
         public Main()
         {
-            _storage = new PluginJsonStorage<Settings>();
+            _storage = new PluginJsonStorage<ShellPluginSettings>();
             _settings = _storage.Load();
         }
 
@@ -43,9 +40,14 @@ namespace Microsoft.Plugin.Shell
             _storage.Save();
         }
 
-
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Keeping the process alive, but logging the exception")]
         public List<Result> Query(Query query)
         {
+            if (query == null)
+            {
+                throw new ArgumentNullException(nameof(query));
+            }
+
             List<Result> results = new List<Result>();
             string cmd = query.Search;
             if (string.IsNullOrEmpty(cmd))
@@ -61,71 +63,40 @@ namespace Microsoft.Plugin.Shell
 
                 try
                 {
-                    string basedir = null;
-                    string dir = null;
-                    string excmd = Environment.ExpandEnvironmentVariables(cmd);
-                    if (Directory.Exists(excmd) && (cmd.EndsWith("/") || cmd.EndsWith(@"\")))
-                    {
-                        basedir = excmd;
-                        dir = cmd;
-                    }
-                    else if (Directory.Exists(Path.GetDirectoryName(excmd) ?? string.Empty))
-                    {
-                        basedir = Path.GetDirectoryName(excmd);
-                        var dirn = Path.GetDirectoryName(cmd);
-                        dir = (dirn.EndsWith("/") || dirn.EndsWith(@"\")) ? dirn : cmd.Substring(0, dirn.Length + 1);
-                    }
-
-                    if (basedir != null)
-                    {
-                        var autocomplete = Directory.GetFileSystemEntries(basedir).
-                            Select(o => dir + Path.GetFileName(o)).
-                            Where(o => o.StartsWith(cmd, StringComparison.OrdinalIgnoreCase) &&
-                                       !results.Any(p => o.Equals(p.Title, StringComparison.OrdinalIgnoreCase)) &&
-                                       !results.Any(p => o.Equals(p.Title, StringComparison.OrdinalIgnoreCase))).ToList();
-                        autocomplete.Sort();
-                        results.AddRange(autocomplete.ConvertAll(m => new Result
-                        {
-                            Title = m,
-                            IcoPath = IconPath,
-                            Action = c =>
-                            {
-                                Execute(Process.Start, PrepareProcessStartInfo(m));
-                                return true;
-                            }
-                        }));
-                    }
+                    List<Result> folderPluginResults = Folder.Main.GetFolderPluginResults(query);
+                    results.AddRange(folderPluginResults);
                 }
                 catch (Exception e)
                 {
                     Log.Exception($"|Microsoft.Plugin.Shell.Main.Query|Exception when query for <{query}>", e);
                 }
+
                 return results;
             }
         }
 
         private List<Result> GetHistoryCmds(string cmd, Result result)
         {
-            IEnumerable<Result> history = _settings.Count.Where(o => o.Key.Contains(cmd))
+            IEnumerable<Result> history = _settings.Count.Where(o => o.Key.Contains(cmd, StringComparison.CurrentCultureIgnoreCase))
                 .OrderByDescending(o => o.Value)
                 .Select(m =>
                 {
                     if (m.Key == cmd)
                     {
-                        result.SubTitle = "Shell: " + string.Format(_context.API.GetTranslation("wox_plugin_cmd_cmd_has_been_executed_times"), m.Value);
+                        result.SubTitle = "Shell: " + string.Format(CultureInfo.CurrentCulture, _context.API.GetTranslation("wox_plugin_cmd_cmd_has_been_executed_times"), m.Value);
                         return null;
                     }
 
                     var ret = new Result
                     {
                         Title = m.Key,
-                        SubTitle = "Shell: " + string.Format(_context.API.GetTranslation("wox_plugin_cmd_cmd_has_been_executed_times"), m.Value),
+                        SubTitle = "Shell: " + string.Format(CultureInfo.CurrentCulture, _context.API.GetTranslation("wox_plugin_cmd_cmd_has_been_executed_times"), m.Value),
                         IcoPath = IconPath,
                         Action = c =>
                         {
                             Execute(Process.Start, PrepareProcessStartInfo(m.Key));
                             return true;
-                        }
+                        },
                     };
                     return ret;
                 }).Where(o => o != null).Take(4);
@@ -144,7 +115,7 @@ namespace Microsoft.Plugin.Shell
                 {
                     Execute(Process.Start, PrepareProcessStartInfo(cmd));
                     return true;
-                }
+                },
             };
 
             return result;
@@ -156,13 +127,13 @@ namespace Microsoft.Plugin.Shell
                 .Select(m => new Result
                 {
                     Title = m.Key,
-                    SubTitle = "Shell: " + string.Format(_context.API.GetTranslation("wox_plugin_cmd_cmd_has_been_executed_times"), m.Value),
+                    SubTitle = "Shell: " + string.Format(CultureInfo.CurrentCulture, _context.API.GetTranslation("wox_plugin_cmd_cmd_has_been_executed_times"), m.Value),
                     IcoPath = IconPath,
                     Action = c =>
                     {
                         Execute(Process.Start, PrepareProcessStartInfo(m.Key));
                         return true;
-                    }
+                    },
                 }).Take(5);
             return history.ToList();
         }
@@ -172,16 +143,16 @@ namespace Microsoft.Plugin.Shell
             command = command.Trim();
             command = Environment.ExpandEnvironmentVariables(command);
             var workingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var runAsAdministratorArg = !runAsAdministrator && !_settings.RunAsAdministrator ? "" : "runas";
+            var runAsAdministratorArg = !runAsAdministrator && !_settings.RunAsAdministrator ? string.Empty : "runas";
 
             ProcessStartInfo info;
-            if (_settings.Shell == Shell.Cmd)
+            if (_settings.Shell == ExecutionShell.Cmd)
             {
                 var arguments = _settings.LeaveShellOpen ? $"/k \"{command}\"" : $"/c \"{command}\" & pause";
 
                 info = ShellCommand.SetProcessStartInfo("cmd.exe", workingDirectory, arguments, runAsAdministratorArg);
             }
-            else if (_settings.Shell == Shell.Powershell)
+            else if (_settings.Shell == ExecutionShell.Powershell)
             {
                 string arguments;
                 if (_settings.LeaveShellOpen)
@@ -195,10 +166,10 @@ namespace Microsoft.Plugin.Shell
 
                 info = ShellCommand.SetProcessStartInfo("powershell.exe", workingDirectory, arguments, runAsAdministratorArg);
             }
-            else if (_settings.Shell == Shell.RunCommand)
+            else if (_settings.Shell == ExecutionShell.RunCommand)
             {
-                //Open explorer if the path is a file or directory
-                if(Directory.Exists(command) || File.Exists(command))
+                // Open explorer if the path is a file or directory
+                if (Directory.Exists(command) || File.Exists(command))
                 {
                     info = ShellCommand.SetProcessStartInfo("explorer.exe", arguments: command, verb: runAsAdministratorArg);
                 }
@@ -236,11 +207,11 @@ namespace Microsoft.Plugin.Shell
             return info;
         }
 
-        private void Execute(Func<ProcessStartInfo, Process> startProcess,ProcessStartInfo info)
+        private void Execute(Func<ProcessStartInfo, Process> startProcess, ProcessStartInfo info)
         {
             try
             {
-                startProcess(info);                
+                startProcess(info);
             }
             catch (FileNotFoundException e)
             {
@@ -248,7 +219,7 @@ namespace Microsoft.Plugin.Shell
                 var message = $"Command not found: {e.Message}";
                 _context.API.ShowMsg(name, message);
             }
-            catch(Win32Exception e)
+            catch (Win32Exception e)
             {
                 var name = "Plugin: Shell";
                 var message = $"Error running the command: {e.Message}";
@@ -256,7 +227,7 @@ namespace Microsoft.Plugin.Shell
             }
         }
 
-        private bool ExistInPath(string filename)
+        private static bool ExistInPath(string filename)
         {
             if (File.Exists(filename))
             {
@@ -276,6 +247,7 @@ namespace Microsoft.Plugin.Shell
                             return true;
                         }
                     }
+
                     return false;
                 }
                 else
@@ -305,39 +277,9 @@ namespace Microsoft.Plugin.Shell
             }
         }
 
-        private void OnThemeChanged(Theme _, Theme newTheme)
+        private void OnThemeChanged(Theme currentTheme, Theme newTheme)
         {
             UpdateIconPath(newTheme);
-        }
-
-        bool API_GlobalKeyboardEvent(int keyevent, int vkcode, SpecialKeyState state)
-        {
-            // not overriding Win+R 
-            // crutkas we need to earn the right for Win+R override
-            /*
-            if (_settings.ReplaceWinR)
-            {
-                if (keyevent == (int)KeyEvent.WM_KEYDOWN && vkcode == (int)Keys.R && state.WinPressed)
-                {
-                    _winRStroked = true;
-                    OnWinRPressed();
-                    return false;
-                }
-                if (keyevent == (int)KeyEvent.WM_KEYUP && _winRStroked && vkcode == (int)Keys.LWin)
-                {
-                    _winRStroked = false;
-                    _keyboardSimulator.ModifiedKeyStroke(VirtualKeyCode.LWIN, VirtualKeyCode.BACK);
-                    return false;
-                }
-            }
-            */
-            return true;
-        }
-
-        private void OnWinRPressed()
-        {
-            _context.API.ChangeQuery($"{_context.CurrentPluginMetadata.ActionKeywords[0]}{Wox.Plugin.Query.TermSeparator}");
-            Application.Current.MainWindow.Visibility = Visibility.Visible;
         }
 
         public Control CreateSettingPanel()
@@ -366,13 +308,13 @@ namespace Microsoft.Plugin.Shell
                     Glyph = "\xE7EF",
                     FontFamily = "Segoe MDL2 Assets",
                     AcceleratorKey = Key.Enter,
-                    AcceleratorModifiers = (ModifierKeys.Control | ModifierKeys.Shift),
+                    AcceleratorModifiers = ModifierKeys.Control | ModifierKeys.Shift,
                     Action = c =>
                     {
                         Execute(Process.Start, PrepareProcessStartInfo(selectedResult.Title, true));
                         return true;
-                    }
-                }
+                    },
+                },
             };
 
             return resultlist;
@@ -380,7 +322,6 @@ namespace Microsoft.Plugin.Shell
 
         public void UpdateSettings(PowerLauncherSettings settings)
         {
-            //_settings.ReplaceWinR = settings.properties.override_win_r_key;
         }
     }
 }

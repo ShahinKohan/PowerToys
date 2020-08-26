@@ -2,15 +2,15 @@
 #include <common/settings_objects.h>
 #include <common/common.h>
 #include <common/debug_control.h>
+#include <common/LowlevelKeyboardEvent.h>
 #include <interface/powertoy_module_interface.h>
-#include <interface/lowlevel_keyboard_event_data.h>
-#include <interface/win_hook_event_data.h>
 #include <lib/ZoneSet.h>
 
-#include <lib/resource.h>
+#include <lib/Generated Files/resource.h>
 #include <lib/trace.h>
 #include <lib/Settings.h>
 #include <lib/FancyZones.h>
+#include <lib/FancyZonesData.h>
 #include <lib/FancyZonesWinHookEventIDs.h>
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
@@ -41,13 +41,6 @@ public:
     virtual PCWSTR get_name() override
     {
         return app_name.c_str();
-    }
-
-    // Return array of the names of all events that this powertoy listens for, with
-    // nullptr as the last element of the array. Nullptr can also be returned for empty list.
-    virtual PCWSTR* get_events() override
-    {
-        return nullptr;
     }
 
     // Return JSON with the configuration options.
@@ -89,7 +82,10 @@ public:
                 s_llKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, GetModuleHandle(NULL), NULL);
                 if (!s_llKeyboardHook)
                 {
-                    MessageBoxW(NULL, L"Cannot install keyboard listener.", L"PowerToys - FancyZones", MB_OK | MB_ICONERROR);
+                    MessageBoxW(NULL,
+                                GET_RESOURCE_STRING(IDS_KEYBOARD_LISTENER_ERROR).c_str(),
+                                GET_RESOURCE_STRING(IDS_POWERTOYS_FANCYZONES).c_str(),
+                                MB_OK | MB_ICONERROR);
                 }
             }
 
@@ -110,7 +106,10 @@ public:
                 }
                 else
                 {
-                    MessageBoxW(NULL, L"Cannot install Windows event listener.", L"PowerToys - FancyZones", MB_OK | MB_ICONERROR);
+                    MessageBoxW(NULL,
+                                GET_RESOURCE_STRING(IDS_WINDOW_EVENT_LISTENER_ERROR).c_str(),
+                                GET_RESOURCE_STRING(IDS_POWERTOYS_FANCYZONES).c_str(),
+                                MB_OK | MB_ICONERROR);
                 }
             }
 
@@ -133,15 +132,6 @@ public:
         return (m_app != nullptr);
     }
 
-    // PowertoyModuleIface method, unused
-    virtual intptr_t signal_event(const wchar_t* name, intptr_t data) override
-    {
-        return 0;
-    }
-
-    virtual void register_system_menu_helper(PowertoySystemMenuIface* helper) override {}
-    virtual void signal_system_menu_action(const wchar_t* name) override {}
-
     // Destroy the powertoy and free memory
     virtual void destroy() override
     {
@@ -153,7 +143,7 @@ public:
     {
         app_name = GET_RESOURCE_STRING(IDS_FANCYZONES);
         m_settings = MakeFancyZonesSettings(reinterpret_cast<HINSTANCE>(&__ImageBase), FancyZonesModule::get_name());
-        JSONHelpers::FancyZonesDataInstance().LoadFancyZonesData();
+        FancyZonesDataInstance().LoadFancyZonesData();
         s_instance = this;
     }
 

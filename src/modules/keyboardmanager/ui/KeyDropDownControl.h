@@ -1,6 +1,6 @@
 #pragma once
+#include <keyboardmanager/common/Shortcut.h>
 class KeyboardManagerState;
-class Shortcut;
 
 namespace winrt::Windows
 {
@@ -56,13 +56,13 @@ public:
     }
 
     // Function to set selection handler for single key remap drop down. Needs to be called after the constructor since the singleKeyControl StackPanel is null if called in the constructor
-    void SetSelectionHandler(winrt::Windows::UI::Xaml::Controls::Grid& table, winrt::Windows::UI::Xaml::Controls::StackPanel singleKeyControl, int colIndex, std::vector<std::vector<DWORD>>& singleKeyRemapBuffer);
+    void SetSelectionHandler(winrt::Windows::UI::Xaml::Controls::Grid& table, winrt::Windows::UI::Xaml::Controls::StackPanel singleKeyControl, int colIndex, RemapBuffer& singleKeyRemapBuffer);
 
     // Function for validating the selection of shortcuts for the drop down
-    std::pair<KeyboardManagerHelper::ErrorType, int> ValidateShortcutSelection(winrt::Windows::UI::Xaml::Controls::Grid table, winrt::Windows::UI::Xaml::Controls::StackPanel shortcutControl, winrt::Windows::UI::Xaml::Controls::StackPanel parent, int colIndex, std::vector<std::pair<std::vector<Shortcut>, std::wstring>>& shortcutRemapBuffer, std::vector<std::unique_ptr<KeyDropDownControl>>& keyDropDownControlObjects, winrt::Windows::UI::Xaml::Controls::TextBox targetApp);
+    std::pair<KeyboardManagerHelper::ErrorType, int> ValidateShortcutSelection(winrt::Windows::UI::Xaml::Controls::Grid table, winrt::Windows::UI::Xaml::Controls::StackPanel shortcutControl, winrt::Windows::UI::Xaml::Controls::StackPanel parent, int colIndex, RemapBuffer& shortcutRemapBuffer, std::vector<std::unique_ptr<KeyDropDownControl>>& keyDropDownControlObjects, winrt::Windows::UI::Xaml::Controls::TextBox targetApp, bool isHybridControl, bool isSingleKeyWindow);
 
     // Function to set selection handler for shortcut drop down. Needs to be called after the constructor since the shortcutControl StackPanel is null if called in the constructor
-    void SetSelectionHandler(winrt::Windows::UI::Xaml::Controls::Grid& table, winrt::Windows::UI::Xaml::Controls::StackPanel shortcutControl, winrt::Windows::UI::Xaml::Controls::StackPanel parent, int colIndex, std::vector<std::pair<std::vector<Shortcut>, std::wstring>>& shortcutRemapBuffer, std::vector<std::unique_ptr<KeyDropDownControl>>& keyDropDownControlObjects, winrt::Windows::UI::Xaml::Controls::TextBox& targetApp);
+    void SetSelectionHandler(winrt::Windows::UI::Xaml::Controls::Grid& table, winrt::Windows::UI::Xaml::Controls::StackPanel shortcutControl, winrt::Windows::UI::Xaml::Controls::StackPanel parent, int colIndex, RemapBuffer& shortcutRemapBuffer, std::vector<std::unique_ptr<KeyDropDownControl>>& keyDropDownControlObjects, winrt::Windows::UI::Xaml::Controls::TextBox& targetApp, bool isHybridControl, bool isSingleKeyWindow);
 
     // Function to set the selected index of the drop down
     void SetSelectedIndex(int32_t index);
@@ -71,17 +71,17 @@ public:
     ComboBox GetComboBox();
 
     // Function to add a drop down to the shortcut stack panel
-    static void AddDropDown(winrt::Windows::UI::Xaml::Controls::Grid table, winrt::Windows::UI::Xaml::Controls::StackPanel shortcutControl, winrt::Windows::UI::Xaml::Controls::StackPanel parent, const int colIndex, std::vector<std::pair<std::vector<Shortcut>, std::wstring>>& shortcutRemapBuffer, std::vector<std::unique_ptr<KeyDropDownControl>>& keyDropDownControlObjects, winrt::Windows::UI::Xaml::Controls::TextBox& targetApp);
+    static void AddDropDown(winrt::Windows::UI::Xaml::Controls::Grid table, winrt::Windows::UI::Xaml::Controls::StackPanel shortcutControl, winrt::Windows::UI::Xaml::Controls::StackPanel parent, const int colIndex, RemapBuffer& shortcutRemapBuffer, std::vector<std::unique_ptr<KeyDropDownControl>>& keyDropDownControlObjects, winrt::Windows::UI::Xaml::Controls::TextBox targetApp, bool isHybridControl, bool isSingleKeyWindow);
 
     // Function to get the list of key codes from the shortcut combo box stack panel
-    static std::vector<DWORD> GetKeysFromStackPanel(StackPanel parent);
-
-    // Function to check if a modifier has been repeated in the previous drop downs
-    static bool CheckRepeatedModifier(winrt::Windows::UI::Xaml::Controls::StackPanel parent, int selectedKeyIndex, const std::vector<DWORD>& keyCodeList);
+    static std::vector<int32_t> GetSelectedIndicesFromStackPanel(StackPanel parent);
 
     // Function for validating the selection of shortcuts for all the associated drop downs
-    static void ValidateShortcutFromDropDownList(Grid table, StackPanel shortcutControl, StackPanel parent, int colIndex, std::vector<std::pair<std::vector<Shortcut>, std::wstring>>& shortcutRemapBuffer, std::vector<std::unique_ptr<KeyDropDownControl>>& keyDropDownControlObjects, TextBox targetApp);
+    static void ValidateShortcutFromDropDownList(Grid table, StackPanel shortcutControl, StackPanel parent, int colIndex, RemapBuffer& shortcutRemapBuffer, std::vector<std::unique_ptr<KeyDropDownControl>>& keyDropDownControlObjects, TextBox targetApp, bool isHybridControl, bool isSingleKeyWindow);
 
     // Function to set the warning message
     void SetDropDownError(winrt::Windows::UI::Xaml::Controls::ComboBox currentDropDown, winrt::hstring message);
+
+    // Function to add a shortcut to the UI control as combo boxes
+    static void AddShortcutToControl(Shortcut shortcut, Grid table, StackPanel parent, KeyboardManagerState& keyboardManagerState, const int colIndex, std::vector<std::unique_ptr<KeyDropDownControl>>& keyDropDownControlObjects, RemapBuffer& remapBuffer, StackPanel controlLayout, TextBox targetApp, bool isHybridControl, bool isSingleKeyWindow);
 };

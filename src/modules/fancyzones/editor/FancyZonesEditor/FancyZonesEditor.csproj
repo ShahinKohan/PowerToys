@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-  <Import Project="..\..\..\..\..\installer\Version.props" />
+  <Import Project="..\..\..\..\Version.props" />
   <!-- We don't have GenerateAssemblyInfo task until we use .net core, so we generate it with WriteLinesToFile -->
   <PropertyGroup>
     <AssemblyTitle>FancyZonesEditor</AssemblyTitle>
@@ -80,6 +80,13 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <CodeAnalysisRuleSet>..\..\..\..\codeAnalysis\Rules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
   <PropertyGroup>
     <ApplicationIcon>images\FancyZonesEditor.ico</ApplicationIcon>
   </PropertyGroup>
@@ -109,7 +116,12 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="..\..\..\..\codeAnalysis\GlobalSuppressions.cs">
+      <Link>GlobalSuppressions.cs</Link>
+    </Compile>
     <Compile Include="DashCaseNamingPolicy.cs" />
+    <Compile Include="GridData.cs" />
+    <Compile Include="GridDragHandles.cs" />
     <Compile Include="StringUtils.cs" />
     <Compile Include="Converters\BooleanToBrushConverter.xaml.cs" />
     <Compile Include="Converters\BooleanToIntConverter.xaml.cs" />
@@ -117,7 +129,6 @@
       <DependentUpon>CanvasEditor.xaml</DependentUpon>
     </Compile>
     <Compile Include="EditorWindow.cs" />
-    <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="GridEditor.xaml.cs">
       <DependentUpon>GridEditor.xaml</DependentUpon>
     </Compile>
@@ -237,7 +248,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MahApps.Metro">
-      <Version>2.1.0</Version>
+      <Version>2.1.1</Version>
     </PackageReference>
     <PackageReference Include="System.Text.Json">
       <Version>4.7.2</Version>
